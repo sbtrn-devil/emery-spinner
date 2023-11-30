@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "bin": {
-    "emery-spinner": "./cli.js"
+    "emery-spinner": "cli.js"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
