@@ -1,3 +1,3 @@
 #!/usr/bin/env node
 
-console.log("Yes", ...process.argv);
+require('./emery-spinner.js');
