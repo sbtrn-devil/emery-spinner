@@ -159,7 +159,7 @@ function DepTaskDoer() {
 		if (task) {
 			return task;
 		}
-		//console.log("POSTING TASK", taskId, new Error().stack.split("\n").filter((line) => line.indexOf('deptaskdoer.js') == -1)[1].trim());
+		//console.log("Posting task", taskId, new Error().stack.split("\n").filter((line) => line.indexOf('deptaskdoer.js') == -1)[1].trim());
 
 		task = tasksById[taskId] = {
 			taskId,
@@ -172,6 +172,7 @@ function DepTaskDoer() {
 					throw new Error("This task '" + taskId + "' is a part of circular dependency, its dependencies are locked");
 				}
 				for (var depTask of depTasks) {
+					//console.log("Setting dep %s on %s", taskId, depTask.taskId, new Error().stack.split("\n").filter((line) => line.indexOf('deptaskdoer.js') == -1)[1].trim());
 					if (depTask.loops) {
 						throw new Error("Dependency task '" + depTask.taskId + "' is a part of circular dependency, depending on it is an error");
 					}

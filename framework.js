@@ -635,13 +635,11 @@ exports.Framework = function Framework(rootFilePath) {
 			for (var resGroupNodeId of resGroupNodeIds) {
 				if (nodeExists(resGroupNodeId)) {
 					result.add(resGroupNodeId);
-					requestCheckNode({ nodeId: resGroupNodeId }).setDependsOn(task.task);
 				} else {
 					badNodeIds.push(resGroupNodeId);
 				}
 			}
 
-			await task.untilResumed();
 			// delete the group nodes we've found to be missing
 			for (var badNodeId of badNodeIds) {
 				resGroupNodeIds.delete(badNodeId);
@@ -700,9 +698,9 @@ exports.Framework = function Framework(rootFilePath) {
 			text = iconvlite.decode(await njsFs.promises.readFile(sourceRealPath), "ascii"); // using "as is" 8-bit encoding
 		text = text.split(REGEXP_SOURCE_TAG);
 		if (text.length < 2) {
-			throw new Exception("Source template " + rootCfg["source"] + " contains no <!--#emery-target--> tag");
+			throw new Error("Source template " + rootCfg["source"] + " contains no <!--#emery-target--> tag");
 		} else if (text.length > 2) {
-			throw new Exception("Source template " + rootCfg["source"] + " contains more than one <!--#emery-target--> tags");
+			throw new Error("Source template " + rootCfg["source"] + " contains more than one <!--#emery-target--> tags");
 		}
 
 		return { prologue: text[0], epilogue: text[1] };
@@ -734,9 +732,8 @@ exports.Framework = function Framework(rootFilePath) {
 		case ITEM_JS_PREFIX:
 		case ITEM_RAWJS_PREFIX:
 		case ITEM_ROOT_PREFIX:
-			if (depsChanged) return false; // dependencies changed
 			var fileNode = getNode(ITEM_FILE_PREFIX + mainId);
-			if (toFuckingInt(node.data.cacheTS) < fileNode.data.cacheTS) return false; // stale against its file
+			if (!depsChanged || (toFuckingInt(node.data.cacheTS) < fileNode.data.cacheTS)) return false; // stale against its file
 			break;
 
 		case ITEM_TOOLCFG_PREFIX:
@@ -1505,7 +1502,8 @@ exports.Framework = function Framework(rootFilePath) {
 		while (node.data.state == "need-check") {
 			logDebug("%s: checking dependencies...", nodeId);
 			var oldDeps = new Set(node.getDependencyIds()),
-				newDeps = await getDeps(task, { nodeId });
+				newDeps = await getDeps(task, { nodeId }),
+				depChecksAttempted = false;
 
 			if (!setEquals(oldDeps, newDeps)) {
 				logDebug("%s: dependencies changed %s -> %s", nodeId, oldDeps, newDeps);
@@ -1522,12 +1520,25 @@ exports.Framework = function Framework(rootFilePath) {
 
 				// recursive checks of dependencies should also be done, which may result
 				// in re-iteration
+				depChecksAttempted = true;
 				for (var newDep of newDeps) {
 					var depCheckTask = requestCheckNode({ nodeId: newDep, force: "need-check" });
 					task.task.setDependsOn(depCheckTask.data.checkNodeDepsTask);
 				}
 				await task.untilResumed();
 			} else {
+				if (!depChecksAttempted) {
+					// but the deps themselves may still need check (for example, on first spin)
+					for (var newDep of newDeps) {
+						var depNode = getNode(newDep);
+						if (!depNode.data.state) {
+							logDebug("%s: still check dependency %s", nodeId, newDep);
+							var depCheckTask = requestCheckNode({ nodeId: newDep, force: "need-check" });
+							task.task.setDependsOn(depCheckTask.data.checkNodeDepsTask);
+						}
+					}
+					await task.untilResumed();
+				}
 				node.data.state = "check-stale";
 			}
 		}
@@ -1667,6 +1678,12 @@ exports.Framework = function Framework(rootFilePath) {
 		task.requireSuccessfulDependencies();
 		try {
 			ensureToolProcess();
+			for (var resGroupNodeId of resGroupNodeIds) {
+				var resGrpNode = getNodeIfExists(resGroupNodeId);
+				if (resGrpNode) {
+					await spTool.client.ensureResGroupCached(resGrpNode.data.resGroupId);
+				}
+			}
 			var affectedItems = await spTool.client.flushModifiedGroups();
 			// flushed groups are to be re-checked for deps update
 			for (var affectedItem of affectedItems) {

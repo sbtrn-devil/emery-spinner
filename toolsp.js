@@ -410,11 +410,17 @@ serverCtl = runServer(server = {
 		};
 	},
 
+	async ensureResGroupCached(resGroupId) {
+		await ensureResGroupCached(resGroupId);
+	},
+
 	async flushModifiedGroups() {
 		var affectedItems = new Array();
 		for (var groupId in resGroupCache) {
-			var group = resGroupCache[groupId];
-			if (group[GROUP_MODIFIED]) {
+			var group = resGroupCache[groupId],
+				groupFileName = getGroupFileName(groupId),
+				groupRealFileName = filework.projectPathToRealPath(groupFileName);
+			if (group[GROUP_MODIFIED] || (await filework.fileTimestamp(groupFileName) === null)) {
 				var
 					groupFileName = getGroupFileName(groupId),
 					groupRealFileName = filework.projectPathToRealPath(groupFileName);
