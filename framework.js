@@ -1498,49 +1498,55 @@ exports.Framework = function Framework(rootFilePath) {
 			resNodesToRecheckAfterBuildTest.add(nodeId);
 		}
 
-		// repeat it until the dependencies list is stable
-		while (node.data.state == "need-check") {
-			logDebug("%s: checking dependencies...", nodeId);
-			var oldDeps = new Set(node.getDependencyIds()),
-				newDeps = await getDeps(task, { nodeId }),
-				depChecksAttempted = false;
+		try {
+			// repeat it until the dependencies list is stable
+			while (node.data.state == "need-check") {
+				logDebug("%s: checking dependencies...", nodeId);
+				var oldDeps = new Set(node.getDependencyIds()),
+					newDeps = await getDeps(task, { nodeId }),
+					depChecksAttempted = false;
 
-			if (!setEquals(oldDeps, newDeps)) {
-				logDebug("%s: dependencies changed %s -> %s", nodeId, oldDeps, newDeps);
-				for (var oldDep of oldDeps) {
-					node.removeDependency(oldDep);
-				}
-				for (var newDep of newDeps) {
-					node.addDependency(newDep);
-				}
-
-				// schedule validation task and set it as dependency for our check-stale phase
-				checkTask.data.validateDepGraphTask = task.postDependentTask(...taskValidateDepGraph());
-				checkTask.data.checkNodeStaleTask.setDependsOn(checkTask.data.validateDepGraphTask);
-
-				// recursive checks of dependencies should also be done, which may result
-				// in re-iteration
-				depChecksAttempted = true;
-				for (var newDep of newDeps) {
-					var depCheckTask = requestCheckNode({ nodeId: newDep, force: "need-check" });
-					task.task.setDependsOn(depCheckTask.data.checkNodeDepsTask);
-				}
-				await task.untilResumed();
-			} else {
-				if (!depChecksAttempted) {
-					// but the deps themselves may still need check (for example, on first spin)
+				if (!setEquals(oldDeps, newDeps)) {
+					logDebug("%s: dependencies changed %s -> %s", nodeId, oldDeps, newDeps);
+					for (var oldDep of oldDeps) {
+						node.removeDependency(oldDep);
+					}
 					for (var newDep of newDeps) {
-						var depNode = getNode(newDep);
-						if (!depNode.data.state) {
-							logDebug("%s: still check dependency %s", nodeId, newDep);
-							var depCheckTask = requestCheckNode({ nodeId: newDep, force: "need-check" });
-							task.task.setDependsOn(depCheckTask.data.checkNodeDepsTask);
-						}
+						node.addDependency(newDep);
+					}
+
+					// schedule validation task and set it as dependency for our check-stale phase
+					checkTask.data.validateDepGraphTask = task.postDependentTask(...taskValidateDepGraph());
+					checkTask.data.checkNodeStaleTask.setDependsOn(checkTask.data.validateDepGraphTask);
+
+					// recursive checks of dependencies should also be done, which may result
+					// in re-iteration
+					depChecksAttempted = true;
+					for (var newDep of newDeps) {
+						var depCheckTask = requestCheckNode({ nodeId: newDep, force: "need-check" });
+						task.task.setDependsOn(depCheckTask.data.checkNodeDepsTask);
 					}
 					await task.untilResumed();
+				} else {
+					if (!depChecksAttempted) {
+						// but the deps themselves may still need check (for example, on first spin)
+						for (var newDep of newDeps) {
+							var depNode = getNode(newDep);
+							if (!depNode.data.state) {
+								logDebug("%s: still check dependency %s", nodeId, newDep);
+								var depCheckTask = requestCheckNode({ nodeId: newDep, force: "need-check" });
+								task.task.setDependsOn(depCheckTask.data.checkNodeDepsTask);
+							}
+						}
+						await task.untilResumed();
+					}
+					node.data.state = "check-stale";
 				}
-				node.data.state = "check-stale";
 			}
+		} catch (e) {
+			logError("Error in %s: %s", task.taskId, e);
+			markFailed(node, e);
+			throw e;
 		}
 	}
 	function taskCheckNodeDeps(args) { return ["check-node-deps " + args.nodeId, checkNodeDeps, args]; }

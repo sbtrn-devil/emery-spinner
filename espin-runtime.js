@@ -40,9 +40,9 @@
 		if (typeof (v) === 'string') {
 			var residMatch = v.match(REGEXP_RESID);
 			if (residMatch) {
-				var result = (R[v] || (R[v] = new Object()));
-				preprocessResource(result);
-				return result;
+				// a string that is a valid resource ID must be converted to the direct resource object reference
+				R[v] || (R[v] = new Object());
+				return exports.R$[v]; // enforce resource preprocessing
 			}
 		}
 
@@ -74,7 +74,16 @@
 			var result = R[key];
 			if (result) {
 				if (!result[preprocessed]) {
-					preprocessResource(result);
+					var prepV = preprocessValue(result);
+					switch (prepV === null || typeof (prepV)) {
+					case 'undefined': preprocessResource(result); break;
+					case 'object':
+					case 'function':
+						R[key] = result = prepV;
+						result[preprocessed] = true;
+						break;
+					default: throw new Error("Resource " + key + " was preprocessed to a primitive value " + prepV);
+					}
 				}
 				return result;
 			}
@@ -189,7 +198,7 @@
 
 	runtime.preprocessAllResources = function preprocessAllResources() {
 		for (var resId in R) {
-			exports.R$.resId;
+			exports.R$.resId; // enforce the lazy preprocessing
 		}
 	};
 
