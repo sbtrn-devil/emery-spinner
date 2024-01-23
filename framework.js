@@ -1904,6 +1904,26 @@ exports.Framework = function Framework(rootFilePath) {
 				checkpointTasks = null;
 
 				for (;;) {
+					// errors in files mostly occur due to offering non-existent files for dependencies
+					// in such situations, even after dependent items dependencies are fixed, the stray file nodes stay in the model
+					// and pollute the results with their persistent check errors checks, although they are no longer needed
+					// we should identify such nodes and discard them along with their errors
+					if (itemsInError.size > 0) {
+						var fileNodeIdsToDiscard = new Array();
+						for (var [k] of itemsInError) {
+							if (k.startsWith(ITEM_FILE_PREFIX)) {
+								var fileNode = getNode(k);
+								if (fileNode.getDependentIds().length <= 0) {
+									logInfo("Item %s in error, but is dependency to no one - safe to ignore", k);
+									fileNodeIdsToDiscard.push(k);
+								}
+							}
+						}
+						for (var fileNodeIdToDiscard of fileNodeIdsToDiscard) {
+							deleteNode(fileNodeIdToDiscard);
+						}
+					}
+
 					if (itemsInError.size > 0) {
 						logInfo(itemsInError.size,
 							"items in error after the spin, no release or prune is possible until the issues are resolved");
