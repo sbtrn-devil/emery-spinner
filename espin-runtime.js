@@ -2,6 +2,7 @@
 (function (exports) {
 	const R = new Object(), // resources will be added here
 		preprocessed = Symbol(), // marker that resource has been preprocessed
+		resIdRefd = Symbol(), // marker that resource had been forward referenced via res id string
 		preprocessors = new Array(),
 		runtime = {
 			addResources(resObj) {
@@ -41,7 +42,8 @@
 			var residMatch = v.match(REGEXP_RESID);
 			if (residMatch) {
 				// a string that is a valid resource ID must be converted to the direct resource object reference
-				R[v] || (R[v] = new Object());
+				var resObj = R[v] || (R[v] = new Object());
+				resObj[resIdRefd] = true;
 				return exports.R$[v]; // enforce resource preprocessing
 			}
 		}
@@ -62,25 +64,24 @@
 		Object.assign(v, changes);
 	}
 
-	function preprocessResource(res) {
-		if (res[preprocessed]) return;
-		res[preprocessed] = true; // mark at once to guard against recursion
-		preprocessComponents(res);
-	}
-
 	exports.R$ = new Proxy(R, {
 		get(target, key) {
 			R$accessed = true;
 			var result = R[key];
 			if (result) {
 				if (!result[preprocessed]) {
+					result[preprocessed] = true; // mark at once to guard against recursion
 					var prepV = preprocessValue(result);
 					switch (prepV === null || typeof (prepV)) {
-					case 'undefined': preprocessResource(result); break;
+					case 'undefined': preprocessComponents(result); break; // not offered replacement value, process in-depth
 					case 'object':
 					case 'function':
+						if (result[resIdRefd]) {
+							console.warn("Resource object", key, "replaced by preprocessor after being forward referenced - the earlier forward references to it are invalidated");
+							// TODO: resolve this situation somehow?
+						}
 						R[key] = result = prepV;
-						result[preprocessed] = true;
+						result[preprocessed] = true; // the resource value entirely replaced, so mark it again
 						break;
 					default: throw new Error("Resource " + key + " was preprocessed to a primitive value " + prepV);
 					}
@@ -201,5 +202,7 @@
 			exports.R$.resId; // enforce the lazy preprocessing
 		}
 	};
+
+	runtime.base64Decode = b64decode;
 
 }) (typeof (exports) == 'object' ? exports : globalThis);

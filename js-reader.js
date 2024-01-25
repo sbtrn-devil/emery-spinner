@@ -364,6 +364,18 @@ function *parseJS(jsStr, errors) {
 			continue;
 		}
 
+		if ((token = tryRegexAndAdvance(RGX_SQ_STRING)) ||
+			(token = tryRegexAndAdvance(RGX_DQ_STRING)) ||
+			(token = tryRegexAndAdvance(RGX_ISTR_SINGLE))) {
+			try {
+				yield { type: "string", data: eval(token[0]), line: lastMatchedTokenLine };
+			} catch (e) {
+				// don't yield incorrect strings
+			}
+			wasValue = true;
+			continue;
+		}
+
 		if (token = tryRegexAndAdvance(RGX_ISTR_SINGLE)) {
 			//yield { type: "istr_single", data: token[0], line: lastMatchedTokenLine };
 			wasValue = true;
@@ -413,17 +425,6 @@ function *parseJS(jsStr, errors) {
 
 		if (!wasValue && (token = tryRegexAndAdvance(RGX_REGEX))) {
 			//yield { type: "regex", data: token[0], line: lastMatchedTokenLine };
-			wasValue = true;
-			continue;
-		}
-
-		if ((token = tryRegexAndAdvance(RGX_SQ_STRING)) ||
-			(token = tryRegexAndAdvance(RGX_DQ_STRING))) {
-			try {
-				yield { type: "string", data: eval(token[0]), line: lastMatchedTokenLine };
-			} catch (e) {
-				// don't yield incorrect strings
-			}
 			wasValue = true;
 			continue;
 		}
