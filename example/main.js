@@ -5,7 +5,7 @@
 //#use /lib-generator.js
 
 async function main() {
-	for (var locale of ["ru", "en", "tr"]) {
+	for (var locale of ["en", "ru", "tr"]) {
 		L$.locale = locale;
 
 		// note the `#L@/...`-s below are both declarations and use of the L type resources,
