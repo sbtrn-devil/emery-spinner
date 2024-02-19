@@ -1,0 +1,12 @@
+{
+	"image": "the-tileset.png",
+	"tileSize": [16, 16],
+	"tiles": {
+		"blank": [0, 0],
+		"cross": [1, 0],
+		"dot": [2, 0],
+		"dash": [3, 0],
+		"solid": [0, 1],
+		"brick": [1, 1]
+	}
+}
