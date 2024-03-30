@@ -29,6 +29,8 @@
 	exports._EmerySpinnerRuntime_ = runtime;
 
 	function preprocessValue(v) {
+		if (!v) return; // null, undefined, or atomic value not preprocessible for sure
+
 		var prepV;
 		for (var preprocessor of preprocessors) {
 			var preprocessedValue = preprocessor(v, preprocessValue);
@@ -52,6 +54,8 @@
 	}
 
 	function preprocessComponents(v) {
+		if (!v) return; // null, undefined, or atomic value not preprocessible for sure
+
 		var changes = new Object();
 		for (var k in v) {
 			var prepV = preprocessValue(v[k]);
