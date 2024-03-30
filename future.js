@@ -37,7 +37,7 @@ function Future() {
 			if (err) {
 				me.reject(err);
 			} else {
-				me.resolve(err);
+				me.resolve(result);
 			}
 		},
 

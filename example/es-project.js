@@ -68,3 +68,6 @@
 
 // #use /main.js
 main();
+
+// Note: instead of #use <filename>, you can use #use-raw <filename> - it will just link the JS file without parsing it for any nested ES directives or resource refs, assuming it is UTF-8 encoded.
+// It is useful e. g. to link minified libraries and other 3rd party code that is not meant to be ES aware and as such should not introduce any coincident effects inside ES build

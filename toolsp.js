@@ -9,12 +9,22 @@ const util = require('util'),
 	{ WrappedJSON } = require('./wrapped-json.js'),
 	{ Future } = require('./future.js');
 
-const REGEXP_RESREF = /^#([-A-Za-z0-9._\(\)\[\]\{\}$%!]+)@/,
+const REGEXP_RESREF_IDENTIFY = /^#([-A-Za-z0-9._\(\)\[\]\{\}$%!]+)@/,
 	REGEXP_STD_RESREF = /^#([-A-Za-z0-9._\(\)\[\]\{\}$%!]+)@((?:[^\/]*\/)*)([^\/:]*)(?:(?::)([\S\s]*))?$/,
 	REGEXP_STD_GROUP_SLASH_TRIM = /(^\/+)|(\/+$)/g,
 	REGEXP_GROUP_FILE_BASENAME = /^(\/.*)?(?:\.es-gen\.js)?$/i,
 	ITEM_FILE_PREFIX = "file:",
 	ITEM_RES_PREFIX = "res:";
+
+function setEquals(a, b) {
+	for (var ina of a) {
+		if (!b.has(ina)) return false;
+	}
+	for (var inb of b) {
+		if (!a.has(inb)) return false;
+	}
+	return true;
+}
 
 function jsonEquals(a, b) {
 	if (a === b) return true;
@@ -251,7 +261,7 @@ async function scanResRefs(resId, skipTestable = false) {
 			switch (typeof(v)) {
 			case 'object': await scanNested(v, level + 1); break;
 			case 'string':
-				var match = v.match(REGEXP_RESREF);
+				var match = v.match(REGEXP_RESREF_IDENTIFY);
 				if (match) {
 					// a res ref - correct it to res ID and add to the list
 					var resType = match[1];
@@ -346,29 +356,36 @@ serverCtl = runServer(server = {
 
 		allowedResIdsPerResId[resId] = allowedResIdsPerResId[resId] || new Set();
 		allowedFilesPerResId[resId] = allowedFilesPerResId[resId] || new Set();
-		var deps = await tool.getBuildDependencies({
-			resId,
-			toolkit: makeToolkit(resId, resType) }),
-			result = new Set();
-		// the dependency getter resets the list of allowed resources and files
-		allowedResIdsPerResId[resId] = new Set();
-		allowedFilesPerResId[resId] = new Set();
-		for (var dep of deps) {
-			var resMatch = dep.match(REGEXP_RESREF);
-			if (resMatch) {
-				// it matches res ref format, hence it is a res ref
-				var resType = resMatch[1],
-					depResId = await server.parseResourceRef(resType, dep);
-				result.add(ITEM_RES_PREFIX + depResId.resId);
-				allowedResIdsPerResId[resId].add(depResId);
-			} else {
-				// otherwise it is a file - should be a project root relative path
-				if (dep[0] != '/') {
-					throw Error("File dependency " + dep + " should be in project-root relative path format");
+		var result = new Set(), tentativeDeps = new Set();
+		for (;;) {
+			// repeat until rool returns same set of dependendies twice in a row
+			var deps = await tool.getBuildDependencies({
+				resId,
+				toolkit: makeToolkit(resId, resType) });
+			deps = new Set([...deps]);
+
+			// the dependency getter resets the list of allowed resources and files
+			allowedResIdsPerResId[resId] = new Set();
+			allowedFilesPerResId[resId] = new Set();
+			for (var dep of deps) {
+				var resMatch = dep.match(REGEXP_RESREF_IDENTIFY);
+				if (resMatch) {
+					// it matches res ref format, hence it is a res ref
+					var resType = resMatch[1],
+						depResId = await server.parseResourceRef(resType, { data: dep });
+					result.add(ITEM_RES_PREFIX + depResId.resId);
+					allowedResIdsPerResId[resId].add(depResId);
+				} else {
+					// otherwise it is a file - should be a project root relative path
+					if (dep[0] != '/') {
+						throw Error("File dependency " + dep + " should be in project-root relative path format");
+					}
+						result.add(ITEM_FILE_PREFIX + dep);
+						allowedFilesPerResId[resId].add(dep);
 				}
-				result.add(ITEM_FILE_PREFIX + dep);
-				allowedFilesPerResId[resId].add(dep);
 			}
+			if (setEquals(deps, tentativeDeps)) break;
+			tentativeDeps = deps;
 		}
 		return [...result];
 	},
