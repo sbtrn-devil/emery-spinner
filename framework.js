@@ -220,7 +220,7 @@ exports.Framework = function Framework(rootFilePath) {
 
 	const getRawJSFileNode = genGetNode("rawjs", (node) => {
 		// js item ID is "js:" + project relative file path
-		if (!node.id.startsWith(ITEM_JS_PREFIX)) {
+		if (!node.id.startsWith(ITEM_RAWJS_PREFIX)) {
 			throw new Error("Raw JS file resource " + node.id + " does not start with " + ITEM_RAWJS_PREFIX);
 		}
 		// a JS resource automatically has a corresponding JS file dependency
