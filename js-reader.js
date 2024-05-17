@@ -33,7 +33,7 @@ function *parseSLComment(jsStr, curLine) {
 
 	const RGX_WHITESPACES = /^\s+?(?=\S|\r?\n|\n?\r|$)/;
 	const RGX_NEWLINE = /^(\r?\n|\n\r?)/;
-	const RGX_COMMAND = /^(\r?\n|\n\r?)\s*#((\p{N}|\p{L}|[-_$.])*)/u;
+	const RGX_COMMAND = /^(\r?\n|\n\r?)\s*#((?!LP)(\p{N}|\p{L}|[-_$.])*)/u;
 	const RGX_TOKEN = /^[^\s,:=\[\]]+/;
 	const RGX_DQ_STRING = /^"([^"\\\r\n]|\\(\r\n?|\n\r?|.|$))*("|$|(?=\r?\n|\n\r?))/;
 	const RGX_SQ_STRING = /^'([^'\\\r\n]|\\(\r\n?|\n\r?|.|$))*('|$|(?=\r?\n|\n\r?))/;
